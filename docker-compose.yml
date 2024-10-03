@@ -5,7 +5,46 @@ services:
     build: ./otros/servicio/.
     ports:
       - "3000:3000"
+    networks:
+      - backend
 
+  ms-personas:
+    build:
+      context: ./MS-Personas/.
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    depends_on:
+      - mariadb
+      - kafka
+    networks:
+      - backend
+
+  ms-cuentas:
+    build:
+      context: ./MS-Cuentas/.
+      dockerfile: Dockerfile
+    ports:
+      - "8010:8010"
+    depends_on:
+      - mariadb
+      - kafka
+      - node_app
+    networks:
+      - backend
+
+  ms-tarjetas:
+    build:
+      context: ./MS-Tarjetas/.
+      dockerfile: Dockerfile
+    ports:
+      - "8020:8020"
+    depends_on:
+      - mariadb
+      - kafka
+    networks:
+      - backend
 
   mariadb:
     image: mariadb
@@ -21,6 +60,8 @@ services:
     volumes:
       - ./volumenes/mariadb_data:/var/lib/mysql
       - ./volumenes/initDB.sql:/docker-entrypoint-initdb.d/1.sql  # Montar el directorio con los archivos SQL
+    networks:
+      - backend
 
   mongodb:
     image: mongo:latest
@@ -31,10 +72,45 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: passwordey1234
       MONGO_INITDB_DATABASE: root-db
     ports:
-        - 27017:27017
+      - "27017:27017"
+    networks:
+      - backend
     volumes:
-        - ./volumenes/mongodb_data:/data/db       
-        - ./docker-entrypoint-initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./volumenes/mongodb_data:/data/db
+      - ./docker-entrypoint-initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - backend
+
+  kafka:
+    image: confluentinc/cp-kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+    depends_on:
+      - zookeeper
+    networks:
+      - backend
+
 volumes:
   mariadb_data:
   mongodb_data:
+
+networks:
+  backend:
+    driver: bridge
